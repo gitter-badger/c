@@ -4,7 +4,8 @@
 
 static void expr(Node *);
 static void stmt(Node *);
-static void store(CTy *t);
+static void store(CTy *);
+static void globaldata(char *, CTy *, Node *);
 
 static FILE *o;
 
@@ -74,8 +75,10 @@ decl(Node *n)
 	case SCSTATIC:
 	case SCGLOBAL:
 		out(".data\n");
+
 		for(i = 0; i < n->Decl.syms->len; i++) {
 			sym = vecget(n->Decl.syms, i);
+			globaldata(sym->l, sym->type, n->Decl.init);
 			out(".comm %s, %d, %d\n", sym->label, 8, 8);
 		}
 		break;
@@ -665,6 +668,33 @@ global(Node *n)
 	default:
 		errorf("unimplemented emit global\n");
 	}
+}
+
+static void
+globaldata(char *l, CTy *t, Node *n)
+{
+	Const *c;
+
+	out("%s:\n");
+	if(isitype(t) || isptr(t)) {
+		c = foldexpr(n);
+		if(!c)
+			errorposf(&n->pos, "invalid static initializer");
+		switch(t->size) {
+		case 8:
+			out(".quad %d\n", c->v);
+			return;
+		case 4:
+			out(".word %d\n", c->v);
+			return;
+		case 2:
+			out(".short %d\n", c->v);
+		case 1:
+			out(".byte %d\n", c->v);
+			return;
+		}
+	}
+	panic("unimplemented emit global data");
 }
 
 void
